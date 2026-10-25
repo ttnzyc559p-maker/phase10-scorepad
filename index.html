@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Phase 10 Scorepad</title>
+<meta name="description" content="Keep score for a Phase 10 game: phases, points and the winner, hand by hand.">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Phase 10">
+<meta name="theme-color" content="#eef1f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d1120" media="(prefers-color-scheme: dark)">
+<style>
+:root { color-scheme: light; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+/* Layout: one narrow column like a scorepad — standings on top, round entry as a sheet, history ledger below. Phase colors cycle the deck's four suits. */
+:root {
+  --bg: #eef1f7;
+  --surface: #ffffff;
+  --sunk: #e3e8f1;
+  --ink: #131a2c;
+  --muted: #586179;
+  --line: #d6dce8;
+  --red: #d42a40;
+  --blue: #1d5fd0;
+  --green: #1f8a46;
+  --yellow: #c98f00;
+  --on-accent: #ffffff;
+  --danger: #b4232f;
+  --font-display: "Archivo", "Arial Black", system-ui, sans-serif;
+  --font-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --r: 14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1120; --surface: #161c30; --sunk: #0f1426; --ink: #eef1f8; --muted: #9aa3bb; --line: #283050;
+    --red: #ff5b6f; --blue: #6b9dff; --green: #45c878; --yellow: #ffc93d; --on-accent: #0d1120; --danger: #ff6b76;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d1120; --surface: #161c30; --sunk: #0f1426; --ink: #eef1f8; --muted: #9aa3bb; --line: #283050;
+  --red: #ff5b6f; --blue: #6b9dff; --green: #45c878; --yellow: #ffc93d; --on-accent: #0d1120; --danger: #ff6b76;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.45;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 48px;
+}
+.wrap { max-width: 680px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
+h1, h2, h3 { font-family: var(--font-display); margin: 0; text-wrap: balance; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, input:focus-visible, summary:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+.num { font-family: var(--font-display); font-variant-numeric: tabular-nums; }
+
+/* header */
+.top { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.logo { display: flex; gap: 3px; }
+.logo i { width: 12px; height: 30px; border-radius: 3px; display: block; transform: rotate(-8deg); }
+.logo i:nth-child(1) { background: var(--red); }
+.logo i:nth-child(2) { background: var(--blue); transform: rotate(-2deg); }
+.logo i:nth-child(3) { background: var(--green); transform: rotate(4deg); }
+.logo i:nth-child(4) { background: var(--yellow); transform: rotate(10deg); }
+h1 { font-size: 1.7rem; font-weight: 900; font-stretch: 118%; letter-spacing: -0.01em; line-height: 1; }
+.sub { color: var(--muted); font-size: 0.9rem; margin-top: 4px; }
+.top-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.btn {
+  border: 1px solid var(--line); background: var(--surface); border-radius: 999px;
+  padding: 8px 14px; font-weight: 700; font-size: 0.92rem; min-height: 40px;
+}
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn.big { width: 100%; padding: 14px; font-size: 1.05rem; border-radius: var(--r); font-family: var(--font-display); font-stretch: 110%; letter-spacing: 0.01em; }
+.btn.danger { color: var(--danger); }
+.btn.ghost { background: transparent; }
+
+.banner {
+  border: 1px dashed var(--muted); border-radius: var(--r); padding: 12px 14px;
+  display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap;
+  color: var(--muted); font-size: 0.92rem;
+}
+.banner b { color: var(--ink); }
+
+.label { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 700; }
+.section-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 10px; }
+h2 { font-size: 1.05rem; font-weight: 800; font-stretch: 112%; text-transform: uppercase; letter-spacing: 0.04em; }
+
+/* standings */
+.standings { display: flex; flex-direction: column; gap: 10px; }
+.player {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r);
+  padding: 14px 16px; display: grid; grid-template-columns: auto 1fr auto; gap: 4px 14px; align-items: center;
+}
+.player.leader { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
+.rank { font-family: var(--font-display); font-weight: 800; color: var(--muted); font-size: 0.95rem; width: 1.4em; text-align: center; }
+.pname { font-weight: 700; font-size: 1.08rem; min-width: 0; overflow-wrap: anywhere; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.chip { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.chip.dealer { border-color: var(--yellow); color: var(--yellow); }
+.chip.win { background: var(--green); border-color: var(--green); color: var(--on-accent); }
+.score { text-align: right; grid-row: span 2; }
+.score .num { font-size: 1.6rem; font-weight: 800; line-height: 1; display: block; }
+.score .label { font-size: 0.66rem; }
+.pphase { grid-column: 2; color: var(--muted); font-size: 0.9rem; min-width: 0; }
+.pphase strong { color: var(--ink); }
+.track { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; margin-top: 8px; }
+.track span { height: 8px; border-radius: 3px; background: var(--sunk); }
+.track span.on { background: var(--c); }
+.track span.now { background: transparent; box-shadow: inset 0 0 0 2px var(--c); }
+
+/* phase badge */
+.pb { display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 5px; border-radius: 6px; background: var(--c); color: var(--on-accent); font-family: var(--font-display); font-weight: 800; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+
+/* winner */
+.winner {
+  background: var(--ink); color: var(--bg); border-radius: var(--r); padding: 20px; display: flex; flex-direction: column; gap: 10px;
+}
+.winner h2 { font-size: 1.6rem; text-transform: none; letter-spacing: -0.01em; font-stretch: 118%; font-weight: 900; }
+.winner p { margin: 0; opacity: 0.85; }
+.winner .row { display: flex; gap: 8px; flex-wrap: wrap; }
+.winner .btn { background: var(--bg); color: var(--ink); border-color: var(--bg); }
+
+/* entry sheet */
+.sheet { background: var(--surface); border: 2px solid var(--ink); border-radius: calc(var(--r) + 4px); padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.sheet-head h2 { text-transform: none; font-size: 1.3rem; letter-spacing: 0; }
+.entry { border-top: 1px solid var(--line); padding-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+.entry-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.entry-name { font-weight: 700; font-size: 1.05rem; display: flex; align-items: center; gap: 8px; min-width: 0; overflow-wrap: anywhere; }
+.entry-goal { color: var(--muted); font-size: 0.86rem; }
+.toggle {
+  display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: var(--bg);
+  border-radius: 999px; padding: 7px 14px 7px 8px; font-weight: 700; font-size: 0.9rem; min-height: 40px;
+}
+.toggle .box { width: 24px; height: 24px; border-radius: 6px; border: 2px solid var(--muted); display: grid; place-items: center; }
+.toggle[aria-pressed="true"] { background: var(--green); border-color: var(--green); color: var(--on-accent); }
+.toggle[aria-pressed="true"] .box { border-color: var(--on-accent); }
+.toggle[aria-pressed="true"] .box::after { content: ""; width: 10px; height: 6px; border-left: 3px solid var(--on-accent); border-bottom: 3px solid var(--on-accent); transform: translateY(-2px) rotate(-45deg); }
+.points-row { display: flex; gap: 8px; align-items: stretch; flex-wrap: wrap; }
+.points {
+  width: 96px; font: inherit; font-family: var(--font-display); font-weight: 800; font-size: 1.3rem; text-align: center;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--ink); padding: 6px; font-variant-numeric: tabular-nums;
+}
+.points.err { border-color: var(--danger); box-shadow: 0 0 0 2px var(--danger); }
+.adds { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; min-width: 0; }
+.add {
+  border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 4px 10px; min-height: 44px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1;
+}
+.add b { font-family: var(--font-display); font-size: 0.98rem; }
+.add small { font-size: 0.68rem; color: var(--muted); }
+.add:hover { border-color: var(--muted); }
+.add.out { border-color: var(--green); color: var(--green); }
+.add.out small { color: var(--green); }
+.err-msg { color: var(--danger); font-weight: 700; font-size: 0.92rem; margin: 0; }
+.sheet-foot { display: flex; gap: 8px; flex-wrap: wrap; }
+.sheet-foot .btn.big { flex: 1; min-width: 180px; }
+
+/* history */
+.ledger-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { padding: 9px 10px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+thead th { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 700; }
+tfoot td { font-family: var(--font-display); font-weight: 800; border-bottom: 0; }
+td .made { color: var(--green); font-weight: 700; font-size: 0.8rem; margin-left: 4px; }
+td .miss { color: var(--muted); font-size: 0.8rem; margin-left: 4px; }
+.rbtn { border: 0; background: transparent; padding: 0; text-decoration: underline; text-underline-offset: 3px; color: var(--blue); font-weight: 700; }
+.empty { color: var(--muted); padding: 14px 16px; margin: 0; }
+
+/* reference */
+details { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); }
+summary { padding: 14px 16px; font-family: var(--font-display); font-weight: 800; font-stretch: 112%; text-transform: uppercase; letter-spacing: 0.04em; font-size: 1.05rem; cursor: pointer; }
+.ref { padding: 0 16px 16px; display: grid; gap: 16px; }
+.phases { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.phases li { display: flex; gap: 10px; align-items: center; }
+.values { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.values div { background: var(--bg); border-radius: 10px; padding: 8px; text-align: center; }
+.values b { display: block; font-family: var(--font-display); font-size: 1.2rem; }
+.values span { font-size: 0.78rem; color: var(--muted); }
+.ref p { margin: 0; color: var(--muted); font-size: 0.92rem; max-width: 62ch; }
+
+/* setup */
+.setup { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+.setup h2 { text-transform: none; font-size: 1.3rem; letter-spacing: 0; }
+.setup p { margin: 0; color: var(--muted); font-size: 0.92rem; }
+.name-row { display: flex; gap: 8px; align-items: center; }
+.name-row .pb { flex: none; }
+.name-row input { flex: 1; min-width: 0; font: inherit; font-size: 1.05rem; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--ink); }
+.x { border: 1px solid var(--line); background: transparent; border-radius: 10px; width: 44px; height: 44px; font-size: 1.2rem; color: var(--muted); flex: none; }
+.names { display: flex; flex-direction: column; gap: 8px; }
+.confirm { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 0.92rem; }
+
+@media (max-width: 460px) {
+  h1 { font-size: 1.4rem; }
+  .points { width: 78px; }
+  .values { grid-template-columns: repeat(2, 1fr); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .track span { transition: background-color .3s ease; }
+}
+</style>
+
+</head>
+<body>
+<div class="wrap" id="app"></div>
+
+<script>
+(function () {
+  const KEY = "phase10-scorepad-v1";
+  const COLORS = ["--red", "--blue", "--green", "--yellow"];
+  const PHASES = [
+    "2 sets of 3",
+    "1 set of 3 + 1 run of 4",
+    "1 set of 4 + 1 run of 4",
+    "1 run of 7",
+    "1 run of 8",
+    "1 run of 9",
+    "2 sets of 4",
+    "7 cards of one color",
+    "1 set of 5 + 1 set of 2",
+    "1 set of 5 + 1 set of 3",
+  ];
+  const ADDS = [
+    { v: 5, t: "1–9" },
+    { v: 10, t: "10–12" },
+    { v: 15, t: "Skip" },
+    { v: 25, t: "Wild" },
+  ];
+  const col = (phase) => `var(${COLORS[(phase - 1) % 4]})`;
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const uid = () => Math.random().toString(36).slice(2, 9);
+
+  function exampleGame() {
+    const p = ["Maya", "Jonah", "Priya", "Theo"].map((name) => ({ id: uid(), name }));
+    const r = (rows) => ({ entries: Object.fromEntries(rows.map(([made, points], i) => [p[i].id, { made, points }])) });
+    return {
+      mode: "game", example: true, players: p,
+      rounds: [
+        r([[true, 0], [true, 35], [false, 85], [true, 20]]),
+        r([[true, 15], [false, 60], [true, 0], [true, 45]]),
+        r([[false, 70], [true, 0], [true, 30], [false, 95]]),
+        r([[true, 0], [true, 25], [false, 50], [true, 40]]),
+      ],
+      setupNames: [],
+    };
+  }
+
+  function blankSetup(names) {
+    return { mode: "setup", example: false, players: [], rounds: [], setupNames: names && names.length ? names : ["", "", ""] };
+  }
+
+  let state;
+  let draft = null;        // { index: number|null, entries: {id:{made, points:string}} }
+  let draftError = null;
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (s && Array.isArray(s.players) && Array.isArray(s.rounds)) return s;
+      }
+    } catch (e) {}
+    return exampleGame();
+  }
+  function save() {
+    if (state.example) return;
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+  }
+
+  // Stats after the first `upTo` rounds (default: all).
+  function stats(upTo) {
+    const rounds = state.rounds.slice(0, upTo == null ? state.rounds.length : upTo);
+    return state.players.map((p, i) => {
+      let made = 0, total = 0;
+      rounds.forEach((r) => {
+        const e = r.entries[p.id];
+        if (!e) return;
+        if (e.made) made++;
+        total += Number(e.points) || 0;
+      });
+      return { ...p, i, made: Math.min(made, 10), total, done: made >= 10 };
+    });
+  }
+
+  function ranked(list) {
+    return [...list].sort((a, b) => b.made - a.made || a.total - b.total || a.i - b.i);
+  }
+
+  function result() {
+    const s = stats();
+    const finishers = s.filter((p) => p.done);
+    if (!finishers.length) return null;
+    const best = Math.min(...finishers.map((p) => p.total));
+    return { winners: finishers.filter((p) => p.total === best), best };
+  }
+
+  const dealerIndex = () => state.players.length ? state.rounds.length % state.players.length : 0;
+
+  // ---------- render ----------
+  function render() {
+    const app = document.getElementById("app");
+    app.innerHTML = state.mode === "setup" ? renderSetup() : renderGame();
+    if (state.mode === "setup") bindSetupInputs();
+    if (draft) bindDraftInputs();
+  }
+
+  function header(subtitle, actions) {
+    return `<header class="top">
+      <div class="brand">
+        <div class="logo" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+        <div><h1>Phase 10 Scorepad</h1><div class="sub">${subtitle}</div></div>
+      </div>
+      <div class="top-actions">${actions || ""}</div>
+    </header>`;
+  }
+
+  function renderSetup() {
+    const rows = state.setupNames.map((n, i) => `
+      <div class="name-row">
+        <span class="pb" style="--c:${col(i + 1)}">${i + 1}</span>
+        <input id="name-${i}" data-name="${i}" type="text" autocomplete="off" maxlength="20" placeholder="Player ${i + 1}" value="${esc(n)}" aria-label="Player ${i + 1} name">
+        ${state.setupNames.length > 2 ? `<button class="x" data-action="remove-name" data-i="${i}" aria-label="Remove player ${i + 1}">×</button>` : ""}
+      </div>`).join("");
+    return header("Set up a new game", state.players.length ? `<button class="btn" data-action="back-to-game">Back to game</button>` : "") + `
+      <section class="setup">
+        <h2>Who's playing?</h2>
+        <p>Enter 2 to 6 players in seating order. The first player deals the first hand, and the deal moves down the list each round.</p>
+        <div class="names">${rows}</div>
+        ${state.setupNames.length < 6 ? `<button class="btn" data-action="add-name">+ Add player</button>` : ""}
+        ${draftError ? `<p class="err-msg">${esc(draftError)}</p>` : ""}
+        <button class="btn primary big" data-action="start">Start game</button>
+      </section>
+      ${renderReference(true)}`;
+  }
+
+  function renderGame() {
+    const s = stats();
+    const order = ranked(s);
+    const res = result();
+    const dealer = state.players[dealerIndex()];
+    const roundNo = state.rounds.length + 1;
+    const sub = res ? `Game over after ${state.rounds.length} hands`
+      : `Hand ${roundNo} · ${esc(dealer ? dealer.name : "")} deals`;
+
+    const banner = state.example ? `<div class="banner"><span><b>This is an example game</b> with made-up players. Start your own when you sit down to play.</span><button class="btn primary" data-action="new-game">Start a game</button></div>` : "";
+
+    const winner = res ? `<section class="winner" aria-live="polite">
+        <span class="label" style="color:inherit;opacity:.7">Final</span>
+        <h2>${res.winners.length > 1 ? "Tie: " + res.winners.map((w) => esc(w.name)).join(" & ") : esc(res.winners[0].name) + " wins"}</h2>
+        <p>Completed Phase 10 with the lowest score, ${res.best} points.</p>
+        <div class="row">
+          <button class="btn" data-action="rematch">Rematch, same players</button>
+          <button class="btn" data-action="new-game">New players</button>
+        </div>
+      </section>` : "";
+
+    const leaderId = order.length && order[0].made > 0 ? order[0].id : null;
+    const cards = order.map((p, rank) => {
+      const phase = p.done ? 10 : p.made + 1;
+      const isWin = res && res.winners.some((w) => w.id === p.id);
+      const track = Array.from({ length: 10 }, (_, k) => {
+        const cls = k < p.made ? "on" : (!p.done && k === p.made ? "now" : "");
+        return `<span class="${cls}" style="--c:${col(k + 1)}"></span>`;
+      }).join("");
+      return `<article class="player ${!res && p.id === leaderId ? "leader" : ""}">
+        <span class="rank">${rank + 1}</span>
+        <div class="pname">${esc(p.name)}
+          ${!res && dealer && p.id === dealer.id ? `<span class="chip dealer">Deals</span>` : ""}
+          ${isWin ? `<span class="chip win">Winner</span>` : ""}
+          ${!res && p.id === leaderId ? `<span class="chip">Leading</span>` : ""}
+        </div>
+        <div class="score"><span class="num">${p.total}</span><span class="label">points</span></div>
+        <div class="pphase">${p.done ? `<strong>All 10 phases complete</strong>` : `On <strong>Phase ${phase}</strong> · ${PHASES[phase - 1]}`}</div>
+        <div class="track" role="img" aria-label="${p.made} of 10 phases complete">${track}</div>
+      </article>`;
+    }).join("");
+
+    const entryBtn = !draft && !res ? `<button class="btn primary big" data-action="open-entry">Score hand ${roundNo}</button>` : "";
+
+    return header(sub, `<button class="btn" data-action="new-game">New game</button>`) + banner + winner + `
+      <section>
+        <div class="section-head"><h2>Standings</h2><span class="label">Most phases, then fewest points</span></div>
+        <div class="standings">${cards}</div>
+      </section>
+      ${draft ? renderSheet() : entryBtn}
+      ${renderLedger(s)}
+      ${renderReference(false)}`;
+  }
+
+  function renderSheet() {
+    const editing = draft.index != null;
+    const before = stats(editing ? draft.index : state.rounds.length);
+    const n = editing ? draft.index + 1 : state.rounds.length + 1;
+    const rows = state.players.map((p) => {
+      const st = before.find((x) => x.id === p.id);
+      const phase = st.done ? 10 : st.made + 1;
+      const e = draft.entries[p.id];
+      const bad = draftError && draftError.ids && draftError.ids.includes(p.id);
+      return `<div class="entry">
+        <div class="entry-top">
+          <div>
+            <div class="entry-name"><span class="pb" style="--c:${col(phase)}">${phase}</span>${esc(p.name)}</div>
+            <div class="entry-goal">${st.done ? "Already finished" : PHASES[phase - 1]}</div>
+          </div>
+          <button class="toggle" data-action="toggle-made" data-id="${p.id}" aria-pressed="${e.made}">
+            <span class="box" aria-hidden="true"></span>Made phase ${phase}
+          </button>
+        </div>
+        <div class="points-row">
+          <input class="points ${bad ? "err" : ""}" id="pts-${p.id}" data-pts="${p.id}" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="–" value="${esc(e.points)}" aria-label="Points left in ${esc(p.name)}'s hand">
+          <div class="adds">
+            <button class="add out" data-action="went-out" data-id="${p.id}"><b>Out</b><small>0 pts</small></button>
+            ${ADDS.map((a) => `<button class="add" data-action="add" data-id="${p.id}" data-v="${a.v}" aria-label="Add ${a.v} for a ${a.t} card"><b>+${a.v}</b><small>${a.t}</small></button>`).join("")}
+            <button class="add" data-action="clear" data-id="${p.id}" aria-label="Clear ${esc(p.name)}'s points"><b>⌫</b><small>clear</small></button>
+          </div>
+        </div>
+      </div>`;
+    }).join("");
+    return `<section class="sheet" aria-label="Score hand ${n}">
+      <div class="sheet-head"><h2>${editing ? "Edit" : "Score"} hand ${n}</h2><button class="btn ghost" data-action="cancel-entry">Cancel</button></div>
+      <p class="entry-goal" style="margin:0">Tap a card button once for each card left in a player's hand, or type the total.</p>
+      ${rows}
+      ${draftError ? `<p class="err-msg" role="alert">${esc(draftError.msg)}</p>` : ""}
+      <div class="sheet-foot">
+        <button class="btn primary big" data-action="save-entry">${editing ? "Save changes" : "Save hand " + n}</button>
+        ${editing ? `<button class="btn danger" data-action="delete-round">Delete hand</button>` : ""}
+      </div>
+    </section>`;
+  }
+
+  function renderLedger(s) {
+    if (!state.rounds.length) {
+      return `<section><div class="section-head"><h2>Hands</h2></div><div class="ledger-wrap"><p class="empty">No hands scored yet. Scores appear here after each hand.</p></div></section>`;
+    }
+    const running = {};
+    state.players.forEach((p) => (running[p.id] = 0));
+    const made = {};
+    state.players.forEach((p) => (made[p.id] = 0));
+    const body = state.rounds.map((r, idx) => {
+      const cells = state.players.map((p) => {
+        const e = r.entries[p.id] || { made: false, points: 0 };
+        const ph = Math.min(made[p.id] + 1, 10);
+        if (e.made) made[p.id]++;
+        running[p.id] += Number(e.points) || 0;
+        return `<td>${Number(e.points) || 0}${e.made ? `<span class="made" title="Made phase ${ph}">P${ph}✓</span>` : `<span class="miss" title="Missed phase ${ph}">P${ph}</span>`}</td>`;
+      }).join("");
+      return `<tr><td><button class="rbtn" data-action="edit-round" data-i="${idx}" aria-label="Edit hand ${idx + 1}">Hand ${idx + 1}</button></td>${cells}</tr>`;
+    }).join("");
+    const foot = state.players.map((p) => `<td>${s.find((x) => x.id === p.id).total}</td>`).join("");
+    return `<section>
+      <div class="section-head"><h2>Hands</h2><span class="label">Tap a hand to fix it</span></div>
+      <div class="ledger-wrap"><table>
+        <thead><tr><th>Hand</th>${state.players.map((p) => `<th>${esc(p.name)}</th>`).join("")}</tr></thead>
+        <tbody>${body}</tbody>
+        <tfoot><tr><td>Total</td>${foot}</tr></tfoot>
+      </table></div>
+    </section>`;
+  }
+
+  function renderReference(open) {
+    return `<details ${open ? "open" : ""} id="ref">
+      <summary>Phases &amp; card values</summary>
+      <div class="ref">
+        <ol class="phases">${PHASES.map((t, i) => `<li><span class="pb" style="--c:${col(i + 1)}">${i + 1}</span>${t}</li>`).join("")}</ol>
+        <div>
+          <div class="label" style="margin-bottom:8px">Cards left in hand</div>
+          <div class="values">
+            <div><b>5</b><span>1 through 9</span></div>
+            <div><b>10</b><span>10, 11, 12</span></div>
+            <div><b>15</b><span>Skip</span></div>
+            <div><b>25</b><span>Wild</span></div>
+          </div>
+        </div>
+        <p>A set is cards of the same number. A run is cards in numerical order. The hand ends when one player goes out. Players who completed their phase move on to the next one. When someone completes Phase 10, the player who finished Phase 10 with the fewest points wins.</p>
+      </div>
+    </details>`;
+  }
+
+  // ---------- inputs that shouldn't re-render ----------
+  function bindSetupInputs() {
+    document.querySelectorAll("[data-name]").forEach((el) => {
+      el.addEventListener("input", () => { state.setupNames[+el.dataset.name] = el.value; save(); });
+      el.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter") {
+          const next = document.getElementById("name-" + (+el.dataset.name + 1));
+          if (next) next.focus(); else act("start");
+        }
+      });
+    });
+  }
+  function bindDraftInputs() {
+    document.querySelectorAll("[data-pts]").forEach((el) => {
+      el.addEventListener("input", () => {
+        el.value = el.value.replace(/[^0-9]/g, "");
+        draft.entries[el.dataset.pts].points = el.value;
+        el.classList.remove("err");
+      });
+    });
+  }
+
+  // ---------- actions ----------
+  function openEntry(index) {
+    const src = index != null ? state.rounds[index] : null;
+    draft = { index, entries: {} };
+    state.players.forEach((p) => {
+      const e = src && src.entries[p.id];
+      draft.entries[p.id] = e ? { made: !!e.made, points: String(e.points) } : { made: false, points: "" };
+    });
+    draftError = null;
+  }
+
+  function act(action, el) {
+    const id = el && el.dataset.id;
+    switch (action) {
+      case "add-name": state.setupNames.push(""); render(); document.getElementById("name-" + (state.setupNames.length - 1))?.focus(); save(); return;
+      case "remove-name": state.setupNames.splice(+el.dataset.i, 1); break;
+      case "start": {
+        const names = state.setupNames.map((n) => n.trim()).filter(Boolean);
+        if (names.length < 2) { draftError = "Add at least two player names to start."; break; }
+        const lower = names.map((n) => n.toLowerCase());
+        if (new Set(lower).size !== lower.length) { draftError = "Two players have the same name. Add an initial so you can tell them apart."; break; }
+        draftError = null;
+        state = { mode: "game", example: false, players: names.map((name) => ({ id: uid(), name })), rounds: [], setupNames: names };
+        draft = null;
+        break;
+      }
+      case "back-to-game": state.mode = "game"; draftError = null; break;
+      case "new-game": {
+        const names = state.example ? ["", "", ""] : state.players.map((p) => p.name);
+        state = blankSetup(names);
+        draft = null; draftError = null;
+        break;
+      }
+      case "rematch": state.rounds = []; state.example = false; draft = null; break;
+      case "open-entry": openEntry(null); break;
+      case "edit-round": openEntry(+el.dataset.i); break;
+      case "cancel-entry": draft = null; draftError = null; break;
+      case "toggle-made": draft.entries[id].made = !draft.entries[id].made; break;
+      case "went-out": draft.entries[id] = { made: true, points: "0" }; break;
+      case "add": draft.entries[id].points = String((Number(draft.entries[id].points) || 0) + Number(el.dataset.v)); break;
+      case "clear": draft.entries[id].points = ""; break;
+      case "save-entry": {
+        const missing = state.players.filter((p) => draft.entries[p.id].points === "");
+        if (missing.length) { draftError = { ids: missing.map((p) => p.id), msg: `Enter points for ${missing.map((p) => p.name).join(", ")}. Use 0 for the player who went out.` }; break; }
+        const odd = state.players.filter((p) => Number(draft.entries[p.id].points) % 5 !== 0);
+        if (odd.length) { draftError = { ids: odd.map((p) => p.id), msg: `Every card is worth 5, 10, 15 or 25, so totals end in 0 or 5. Check ${odd.map((p) => p.name).join(", ")}.` }; break; }
+        const round = { entries: {} };
+        state.players.forEach((p) => { const e = draft.entries[p.id]; round.entries[p.id] = { made: e.made, points: Number(e.points) }; });
+        if (draft.index != null) state.rounds[draft.index] = round; else state.rounds.push(round);
+        draft = null; draftError = null;
+        break;
+      }
+      case "delete-round": state.rounds.splice(draft.index, 1); draft = null; draftError = null; break;
+      default: return;
+    }
+    save();
+    render();
+    if (action === "open-entry" || action === "edit-round") document.querySelector(".sheet")?.scrollIntoView({ block: "start", behavior: "smooth" });
+  }
+
+  document.addEventListener("click", (ev) => {
+    const el = ev.target.closest("[data-action]");
+    if (el) act(el.dataset.action, el);
+  });
+
+  function start(data) {
+    state = data && data.state ? data.state : load();
+    draft = data && data.draft ? data.draft : null;
+    render();
+  }
+  start({});
+})();
+</script>
+</body>
+</html>
